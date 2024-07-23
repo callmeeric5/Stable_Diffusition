@@ -1,0 +1,38 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <Languages>
+        <language minSize="46" name="Python" />
+      </Languages>
+    </inspection_tool>
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <value>
+          <list size="13">
+            <item index="0" class="java.lang.String" itemvalue="pandas" />
+            <item index="1" class="java.lang.String" itemvalue="scipy" />
+            <item index="2" class="java.lang.String" itemvalue="seaborn" />
+            <item index="3" class="java.lang.String" itemvalue="house_prices" />
+            <item index="4" class="java.lang.String" itemvalue="numpy" />
+            <item index="5" class="java.lang.String" itemvalue="streamlit" />
+            <item index="6" class="java.lang.String" itemvalue="fastapi" />
+            <item index="7" class="java.lang.String" itemvalue="pydantic" />
+            <item index="8" class="java.lang.String" itemvalue="xgbboost" />
+            <item index="9" class="java.lang.String" itemvalue="scikit_learn" />
+            <item index="10" class="java.lang.String" itemvalue="xgboost" />
+            <item index="11" class="java.lang.String" itemvalue="SQLAlchemy" />
+            <item index="12" class="java.lang.String" itemvalue="airflow" />
+          </list>
+        </value>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyUnresolvedReferencesInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredIdentifiers">
+        <list>
+          <option value="train.house_prices" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
