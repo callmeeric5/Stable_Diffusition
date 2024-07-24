@@ -8,11 +8,16 @@ from utils import image_to_bytes
 
 
 def gallery():
+    if not st.session_state.logged_in:
+        st.warning("Please log in to access this page.")
+        st.stop()
     st.title("Gallery")
 
     # Get list of images and metadata files
     images = sorted([f for f in os.listdir("gallery/images") if f.endswith(".png")])
-    metadata_files = sorted([f for f in os.listdir("gallery/metadata") if f.endswith(".json")])
+    metadata_files = sorted(
+        [f for f in os.listdir("gallery/metadata") if f.endswith(".json")]
+    )
 
     if not images:
         st.warning("No images in the gallery.")
@@ -58,7 +63,9 @@ def gallery():
 
                 with row[j]:
                     image = load_image(image_path)
-                    image = scale_image(image, 300, 300)  # Scale image to 300x300 for display
+                    image = scale_image(
+                        image, 300, 300
+                    )  # Scale image to 300x300 for display
                     st.image(image, use_column_width=True)
                     metadata = load_metadata(metadata_path)
                     st.text(f"Prompt: {metadata['prompt']}")
@@ -67,7 +74,7 @@ def gallery():
                         data=image_to_bytes(image),
                         file_name=images[i + j],
                         mime="image/png",
-                        use_container_width=True
+                        use_container_width=True,
                     )
                     if st.button(f"Delete", key=f"delete_{i + j}"):
                         delete_image(image_path, metadata_path)
@@ -93,7 +100,7 @@ def image_to_bytes(image):
     if image is None:
         return None
     img_byte_arr = io.BytesIO()
-    image.save(img_byte_arr, format='PNG')
+    image.save(img_byte_arr, format="PNG")
     return img_byte_arr.getvalue()
 
 

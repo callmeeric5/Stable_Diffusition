@@ -1,9 +1,19 @@
 import streamlit as st
-from utils import generate_image, apply_adjustments, image_to_bytes, save_to_gallery, ui_tab_txt2img
+from utils import (
+    generate_image,
+    apply_adjustments,
+    image_to_bytes,
+    save_to_gallery,
+    ui_tab_txt2img,
+)
 
 st.set_page_config(page_title="Home", layout="wide")
 
+
 def home_page():
+    if not st.session_state.logged_in:
+        st.warning("Please log in to access this page.")
+        st.stop()
     # Initialize session state variables
     if "generated_image" not in st.session_state:
         st.session_state.generated_image = None
@@ -78,8 +88,11 @@ def home_page():
 
             with col2:
                 if st.button("Save to Gallery", use_container_width=True):
-                    save_to_gallery(st.session_state.adjusted_image, st.session_state.prompt)
+                    save_to_gallery(
+                        st.session_state.adjusted_image, st.session_state.prompt
+                    )
                     st.success("Image saved to gallery successfully!")
+
 
 if __name__ == "__main__":
     home_page()
