@@ -7,29 +7,60 @@ import io
 import os
 import json
 import bcrypt
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    LargeBinary,
+    ForeignKey,
+    Date,
+    DateTime,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+import requests
+import datetime
+from sqlalchemy.orm import Session
+
+API_URL = st.secrets["API_URL"]
 
 
 def signup(username, password, email, date_of_birth):
-    if username in st.session_state.users:
-        return False
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    st.session_state.users[username] = hashed_password
-    return True
+    # Convert date_of_birth to string
+    date_of_birth_str = (
+        date_of_birth.isoformat()
+        if isinstance(date_of_birth, datetime.date)
+        else date_of_birth
+    )
+
+    response = requests.post(
+        f"{API_URL}/users/",
+        json={
+            "username": username,
+            "password": password,
+            "email": email,
+            "date_of_birth": date_of_birth_str,
+        },
+    )
+    if response.status_code == 200:
+        return True
+    return False
 
 
-def login(username, password):
-    if username not in st.session_state.users:
-        return False
-    hashed_password = st.session_state.users[username]
-    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
+def login(username: str, password: str, db: Session):
+    user = db.query(User).filter(User.username == username).first()
+    if user and bcrypt.checkpw(
+        password.encode("utf-8"), user.hashed_password.encode("utf-8")
+    ):
+        return user
+    return None
 
 
 def init_session_state():
-    if 'users' not in st.session_state:
-        st.session_state.users = {}
-    if 'logged_in' not in st.session_state:
+    if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
-    if 'current_user' not in st.session_state:
+    if "current_user" not in st.session_state:
         st.session_state.current_user = None
 
 
@@ -49,24 +80,26 @@ device = (
 def build_pipeline(model_name: str):
     if model_name == "SD V1.5":
         return StableDiffusionPipeline.from_pretrained(
-            'runwayml/stable-diffusion-v1-5',
+            "runwayml/stable-diffusion-v1-5",
             torch_dtype=torch.float16,
             use_safetensors=False,
         ).to(device)
     elif model_name == "SD Pokemon":
         return StableDiffusionPipeline.from_pretrained(
-            'lambdalabs/sd-pokemon-diffusers',
+            "lambdalabs/sd-pokemon-diffusers",
             torch_dtype=torch.float16,
             use_safetensors=False,
         ).to(device)
     elif model_name == "SD Dogs":
-        vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+        vae = AutoencoderKL.from_pretrained(
+            "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+        )
         pipe = DiffusionPipeline.from_pretrained(
             "stabilityai/stable-diffusion-xl-base-1.0",
             vae=vae,
             torch_dtype=torch.float16,
             variant="fp16",
-            use_safetensors=True
+            use_safetensors=True,
         )
         pipe.load_lora_weights("whydelete/husky_lora")
         return pipe.to(device)
@@ -136,7 +169,7 @@ def ui_tab_txt2img():
     prompt_dict = {
         "Dog": "A playful dog running in a park",
         "Cat": "A cat lounging in a sunbeam",
-        "Pokemon": "A Pikachu using Thunderbolt",
+        "Pokemon": "A Pikachu on the grass",
     }
     cols = st.columns(2)
     with cols[0]:
@@ -155,3 +188,51 @@ def ui_tab_txt2img():
         width = st.slider("Width", min_value=128, max_value=1024, value=512, step=128)
 
     return model_name, prompt, height, width
+
+
+DATABASE_URL = st.secrets["DATABASE_URL"]
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    email = Column(String)
+    date_of_birth = Column(Date)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    images = relationship("Image", back_populates="owner")
+
+
+class Image(Base):
+    __tablename__ = "images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String)
+    data = Column(LargeBinary)
+    prompt = Column(String)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    owner = relationship("User", back_populates="images")
+
+
+def create_tables():
+    Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+create_tables()
