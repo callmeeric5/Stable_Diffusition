@@ -8,12 +8,11 @@ LOGIN_URL = 'http://localhost:8000/login'
 PROTECTED_URL = 'http://localhost:8000/protected'
 
 def signup(username, email, password, date_of_birth):
-    """Sign up a new user."""
     response = requests.post(SIGNUP_URL, json={
         'username': username,
         'email': email,
         'password': password,
-        'date_of_birth': date_of_birth.strftime('%Y-%m-%d')  # Convert date to string
+        'date_of_birth': date_of_birth.strftime('%Y-%m-%d')
     })
     if response.status_code == 201:
         st.success('User created successfully')
@@ -21,7 +20,6 @@ def signup(username, email, password, date_of_birth):
         st.error(f'Error creating user: {response.text}')
 
 def login(identifier, password):
-    """Log in a user and store the JWT token."""
     response = requests.post(LOGIN_URL, json={
         'identifier': identifier,
         'password': password
@@ -29,12 +27,12 @@ def login(identifier, password):
     if response.status_code == 200:
         token = response.json().get('token')
         st.session_state.token = token
-        st.success(f'Login successful! Token: {token}')
+        st.session_state.logged_in = True  # Track login status
+        st.success('Login successful!')
     else:
         st.error(f'Error logging in: {response.text}')
 
 def access_protected_route():
-    """Access a protected route using the stored JWT token."""
     if 'token' not in st.session_state:
         st.error('You need to log in first')
         return
@@ -47,12 +45,25 @@ def access_protected_route():
     else:
         st.error("Failed to access protected route.")
 
+def home_page():
+    st.title('Home Page')
+    st.write("Welcome to the home page!")
+    st.button('Access Protected Route', on_click=access_protected_route)
+
 # Streamlit interface
 st.title('User Authentication')
 
 # Sidebar for navigation
 st.sidebar.title('Navigation')
-option = st.sidebar.selectbox('Choose an option', ['Signup', 'Login', 'Access Protected Route'])
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+options = ['Signup', 'Login']
+if st.session_state.logged_in:
+    options.append('Home')
+    options.append('Access Protected Route')
+
+option = st.sidebar.selectbox('Choose an option', options)
 
 if option == 'Signup':
     st.header('Signup')
@@ -81,6 +92,9 @@ elif option == 'Login':
                 login(identifier, password)
             else:
                 st.error('Please fill all fields')
+
+elif option == 'Home':
+    home_page()
 
 elif option == 'Access Protected Route':
     st.header('Protected Route')
