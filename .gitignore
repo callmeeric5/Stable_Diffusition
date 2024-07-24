@@ -18,7 +18,6 @@ lib/
 lib64/
 parts/
 .DS_Store/
-
 sdist/
 var/
 wheels/
