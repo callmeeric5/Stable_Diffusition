@@ -1,4 +1,5 @@
 import streamlit as st
+from transformers import pipeline, Conversation
 from utils import (
     generate_image,
     apply_adjustments,
@@ -8,9 +9,12 @@ from utils import (
 import io
 import requests
 
+# Set up the text-generation pipeline for prompt suggestions and chatbot
+gpt2_pipe = pipeline('text-generation', model='Gustavosta/MagicPrompt-Stable-Diffusion', tokenizer='gpt2')
+chatbot_pipe = pipeline('conversational', model='facebook/blenderbot-400M-distill')
+
 st.set_page_config(page_title="Home", layout="wide")
 API_URL = st.secrets["API_URL"]
-
 
 def save_to_gallery_api(image, user_id, prompt):
     img_byte_arr = io.BytesIO()
@@ -23,12 +27,42 @@ def save_to_gallery_api(image, user_id, prompt):
 
     if response.status_code != 200:
         st.error("Failed to save image to gallery")
+    else:
+        st.success("Image saved to gallery successfully!")
 
+def get_prompt_suggestions(prompt):
+    suggestions = gpt2_pipe(prompt, max_length=50, num_return_sequences=1)
+    return suggestions[0]['generated_text']
+
+def chat_with_bot(user_input):
+    # Initialize conversation history if not present
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = []
+
+    # Create a Conversation object
+    conversation = Conversation(user_input)
+    
+    # Pass the conversation object to the chatbot pipeline
+    conversation = chatbot_pipe(conversation)
+    
+    # Get the latest response
+    if conversation and conversation.generated_responses:
+        response = conversation.generated_responses[-1]
+        response_text = response['text'] if isinstance(response, dict) else response
+    else:
+        response_text = "No response generated."
+
+    # Update the conversation history
+    st.session_state.conversation_history.append(("You", user_input))
+    st.session_state.conversation_history.append(("Bot", response_text))
+
+    return response_text
 
 def home_page():
-    if not st.session_state.logged_in:
+    if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("Please log in to access this page.")
         st.stop()
+
     # Initialize session state variables
     if "generated_image" not in st.session_state:
         st.session_state.generated_image = None
@@ -39,41 +73,17 @@ def home_page():
 
     st.title("Home")
 
-    # Create a container with a fixed height
-    main_container = st.container(height=550)
-
-    with main_container:
-        main_cols = st.columns([3, 1])
-
-        with main_cols[0]:
-            image_placeholder = st.empty()
-            if st.session_state.adjusted_image:
-                image_placeholder.image(st.session_state.adjusted_image)
-
-        with main_cols[1]:
-            brightness = st.slider(
-                "Brightness", 0.0, 2.0, 1.0, 0.1, key="brightness_slider"
-            )
-            contrast = st.slider("Contrast", 0.0, 2.0, 1.0, 0.1, key="contrast_slider")
-            saturation = st.slider(
-                "Saturation", 0.0, 2.0, 1.0, 0.1, key="saturation_slider"
-            )
-
-            if st.session_state.generated_image:
-                adjusted_image = apply_adjustments(
-                    st.session_state.generated_image.copy(),
-                    brightness,
-                    contrast,
-                    saturation,
-                )
-                st.session_state.adjusted_image = adjusted_image
-                image_placeholder.image(adjusted_image)
-
-    tabs = st.tabs(["Generate", "Save"])
+    tabs = st.tabs(["Generate", "Save", "Chat"])
 
     with tabs[0]:
         st.session_state.active_tab = "Text to Image"
         model_name, prompt, height, width = ui_tab_txt2img()
+
+        # Prompt Suggestions
+        with st.expander("Prompt Suggestions"):
+            suggested_prompt = get_prompt_suggestions(prompt)
+            st.write("Suggested Prompt:")
+            st.write(suggested_prompt)
 
         if st.button(
             "Generate", key="txt2img", type="primary", use_container_width=True
@@ -83,6 +93,7 @@ def home_page():
                 st.session_state.generated_image = generated_image
                 st.session_state.adjusted_image = generated_image.copy()
                 st.session_state.prompt = prompt
+                image_placeholder = st.empty()
                 image_placeholder.image(generated_image)
 
     with tabs[1]:
@@ -103,16 +114,30 @@ def home_page():
 
             with col2:
                 if st.button("Save to Gallery", use_container_width=True):
-                    # save_to_gallery(
-                    #     st.session_state.adjusted_image, st.session_state.prompt
-                    # )
                     save_to_gallery_api(
                         st.session_state.adjusted_image,
                         st.session_state.current_user["id"],
                         st.session_state.prompt,
                     )
-                    st.success("Image saved to gallery successfully!")
 
+    with tabs[2]:
+        st.session_state.active_tab = "Chat"
+        st.header("Chat with our Bot")
+
+        # Initialize chat history if not present
+        if "conversation_history" not in st.session_state:
+            st.session_state.conversation_history = []
+
+        user_input = st.text_input("You:", "")
+        if user_input:
+            response = chat_with_bot(user_input)
+            st.text_area(
+                "Chat History", 
+                value="\n".join([f"{speaker}: {message}" for speaker, message in st.session_state.conversation_history]),
+                height=300, 
+                max_chars=None, 
+                key="chat_history"
+            )
 
 if __name__ == "__main__":
     home_page()
