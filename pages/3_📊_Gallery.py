@@ -7,9 +7,8 @@ from datetime import datetime
 
 API_URL = st.secrets["API_URL"]
 
-
 def gallery():
-    if not st.session_state.logged_in:
+    if "logged_in" not in st.session_state or not st.session_state.logged_in:
         st.warning("Please log in to access this page.")
         st.stop()
 
@@ -27,6 +26,10 @@ def gallery():
     if not images:
         st.warning("No images in the gallery.")
         return
+
+    # Initialize page state if not already
+    if "page" not in st.session_state:
+        st.session_state.page = 1
 
     # Sidebar
     with st.sidebar:
@@ -54,21 +57,23 @@ def gallery():
         total_pages = math.ceil(len(images) / items_per_page)
 
         # Page selection
-        page = st.number_input("Page", min_value=1, max_value=total_pages, value=1)
+        st.session_state.page = st.number_input("Page", min_value=1, max_value=total_pages, value=st.session_state.page)
 
-        st.write(f"Page {page} of {total_pages}")
+        st.write(f"Page {st.session_state.page} of {total_pages}")
 
         # Navigation buttons
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Previous") and page > 1:
-                page -= 1
+            if st.button("Previous") and st.session_state.page > 1:
+                st.session_state.page -= 1
+                st.experimental_rerun()
         with col2:
-            if st.button("Next") and page < total_pages:
-                page += 1
+            if st.button("Next") and st.session_state.page < total_pages:
+                st.session_state.page += 1
+                st.experimental_rerun()
 
     # Calculate start and end indices for current page
-    start = (page - 1) * items_per_page
+    start = (st.session_state.page - 1) * items_per_page
     end = start + items_per_page
 
     # Display images and options in a grid layout
@@ -99,19 +104,42 @@ def gallery():
                                 unsafe_allow_html=True,
                             )
 
+                        # Add to Favorites
+                        if st.button(f"Favorite", key=f"favorite_{image['id']}"):
+                            toggle_favorite(image["id"])
+                            st.success(f"Toggled favorite for {image['filename']}")
+                            st.experimental_rerun()
+
+                        # Rate the Image
+                        rating = st.slider(f"Rate this image", 1, 5, key=f"rating_{image['id']}")
+                        if st.button(f"Submit Rating", key=f"submit_rating_{image['id']}"):
+                            submit_rating(image["id"], rating)
+                            st.success(f"Rating submitted for {image['filename']}")
+                            st.experimental_rerun()
+
                         if st.button(f"Delete", key=f"delete_{image['id']}"):
                             delete_image(image["id"])
                             st.success(f"Deleted {image['filename']}")
-                            st.rerun()
+                            st.experimental_rerun()
                     else:
                         st.error(f"Failed to load image {image['filename']}")
 
+def toggle_favorite(image_id):
+    # Implement toggle favorite logic
+    response = requests.post(f"{API_URL}/image/{image_id}/favorite")
+    if response.status_code != 200:
+        st.error("Failed to toggle favorite status")
+
+def submit_rating(image_id, rating):
+    # Implement submit rating logic
+    response = requests.post(f"{API_URL}/image/{image_id}/rate", json={"rating": rating})
+    if response.status_code != 200:
+        st.error("Failed to submit rating")
 
 def delete_image(image_id):
     response = requests.delete(f"{API_URL}/image/{image_id}")
     if response.status_code != 200:
         st.error("Failed to delete image")
-
 
 if __name__ == "__main__":
     gallery()
